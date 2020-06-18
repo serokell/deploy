@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-SSHOPTS=(-o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
+SSHOPTS=()
 export NIX_SSHOPTS="${SSHOPTS[*]}"
 
 # For first deployment to bare server
@@ -21,9 +21,11 @@ get() {
     jq -r ".$1" <<< "$MERGED"
 }
 
-not_set() {
-    echo "$1 is not set for profile $PROFILE of node $NODE"
-    exit 1
+check_set() {
+    if [[ "$(eval "echo \$$1")" == null ]]; then
+        echo "$2 is not set for profile $PROFILE of node $NODE"
+        exit 1
+    fi
 }
 
 deploy_profile() {
@@ -38,9 +40,9 @@ deploy_profile() {
     CLOSURE="$(get path)"
     ACTIVATE="$(get activate)"
 
-    if [[ "$USER" == null ]]; then
-        not_set user
-    fi
+    check_set USER user
+    check_set HOST hostname
+    check_set CLOSURE path
 
     if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$USER" ]]; then
         SUDO="sudo -u $PROFILE_USER"
@@ -82,9 +84,6 @@ deploy_profile() {
     # shellcheck disable=SC2087
     ssh "${SSHOPTS[@]}" "$USER@$HOST" <<EOF
 export PROFILE="$PROFILE_PATH"
-if [[ "$BARE_SERVER" == 1 ]]; then
-   mkdir -p "$(dirname "$PROFILE_PATH")"
-fi
 set -euox pipefail
 $SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE" && eval "$SUDO $ACTIVATE"
 EOF

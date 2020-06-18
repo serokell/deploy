@@ -18,10 +18,10 @@ else
 fi
 
 get() {
-    jq -r ".$1" <<< "$MERGED"
+    jq -r ".$1"
 }
 
-check_set() {
+ensure_set() {
     if [[ "$(eval "echo \$$1")" == null ]]; then
         echo "$2 is not set for profile $PROFILE of node $NODE"
         exit 1
@@ -34,14 +34,14 @@ deploy_profile() {
     ONLY_PROFILE="del(.path) | del(.activate)"
     MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.$NODE | del(.profiles) | $ONLY_PROFILE) + (.nodes.$NODE.profiles.$PROFILE | del(.hostname))" <<< "$JSON")"
 
-    HOST="$(get hostname)"
-    SSH_USER="$(get sshUser)"
-    USER="$(get user)"
-    CLOSURE="$(get path)"
-    ACTIVATE="$(get activate)"
+    HOST="$(get hostname <<< "$MERGED")"
+    SSH_USER="$(get sshUser <<< "$MERGED")"
+    USER="$(get user <<< "$MERGED")"
+    CLOSURE="$(get path <<< "$MERGED")"
+    ACTIVATE="$(get activate <<< "$MERGED")"
 
-    check_set HOST hostname
-    check_set CLOSURE path
+    ensure_set HOST hostname
+    ensure_set CLOSURE path
 
     SUDO=""
 
@@ -91,8 +91,9 @@ deploy_profile() {
     # shellcheck disable=SC2087
     ssh "${SSHOPTS[@]}" "$SSH_USER@$HOST" <<EOF
 export PROFILE="$PROFILE_PATH"
-set -euox pipefail
-$SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE" && eval "$SUDO $ACTIVATE"
+set -euxo pipefail
+$SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE"
+eval "$SUDO $ACTIVATE"
 EOF
     set +x
 }

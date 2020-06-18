@@ -35,29 +35,36 @@ deploy_profile() {
     MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.$NODE | del(.profiles) | $ONLY_PROFILE) + (.nodes.$NODE.profiles.$PROFILE | del(.hostname))" <<< "$JSON")"
 
     HOST="$(get hostname)"
+    SSH_USER="$(get sshUser)"
     USER="$(get user)"
-    PROFILE_USER="$(get profileUser)"
     CLOSURE="$(get path)"
     ACTIVATE="$(get activate)"
 
-    check_set USER user
     check_set HOST hostname
     check_set CLOSURE path
 
-    if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$USER" ]]; then
-        SUDO="sudo -u $PROFILE_USER"
+    SUDO=""
+
+    if [[ "$SSH_USER" == null ]]; then
+        if [[ "$USER" == null ]]; then
+            echo "neither user nor sshUser set for profile $PROFILE of node $NODE"
+        fi
+        SSH_USER=$(whoami)
     else
-        SUDO=""
+        if [[ ! "$USER" == null ]] && [[ ! "$USER" == "$SSH_USER" ]]; then
+            SUDO="sudo -u $USER"
+        fi
+
+        if [[ "$USER" == null ]]; then
+            USER="$SSH_USER"
+        fi
     fi
 
-    if [[ "$PROFILE_USER" == null ]]; then
-        PROFILE_USER="$USER"
-    fi
 
-    if [[ "$PROFILE_USER" == root ]]; then
+    if [[ "$USER" == root ]]; then
         PROFILE_PATH="/nix/var/nix/profiles/$PROFILE"
     else
-        PROFILE_PATH="/nix/var/nix/profiles/per-user/$PROFILE_USER/$PROFILE"
+        PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/$PROFILE"
     fi
 
     if [[ -n ${LOCAL_KEY:-} ]]; then
@@ -78,11 +85,11 @@ deploy_profile() {
 
     set -x
 
-    nix copy --substitute-on-destination --to "ssh://$USER@$HOST" "$CLOSURE"
+    nix copy --substitute-on-destination --to "ssh://$SSH_USER@$HOST" "$CLOSURE"
 
     # shellcheck disable=SC2029
     # shellcheck disable=SC2087
-    ssh "${SSHOPTS[@]}" "$USER@$HOST" <<EOF
+    ssh "${SSHOPTS[@]}" "$SSH_USER@$HOST" <<EOF
 export PROFILE="$PROFILE_PATH"
 set -euox pipefail
 $SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE" && eval "$SUDO $ACTIVATE"

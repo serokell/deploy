@@ -5,8 +5,6 @@
 
 set -euo pipefail
 
-SSHOPTS=()
-export NIX_SSHOPTS="${SSHOPTS[*]}"
 
 # For first deployment to bare server
 if [[ ${1:-} == '--prime' ]]; then
@@ -39,9 +37,17 @@ deploy_profile() {
     USER="$(get user <<< "$MERGED")"
     CLOSURE="$(get path <<< "$MERGED")"
     ACTIVATE="$(get activate <<< "$MERGED")"
+    EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
+
 
     ensure_set HOST hostname
     ensure_set CLOSURE path
+
+    if [[ "$EXTRA_SSH_OPTS" == null ]]; then
+        EXTRA_SSH_OPTS=""
+    fi
+
+    export NIX_SSHOPTS="${SSHOPTS:-} ${EXTRA_SSH_OPTS}"
 
     SUDO=""
 
@@ -67,16 +73,10 @@ deploy_profile() {
         PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/$PROFILE"
     fi
 
+    nix build "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
+
     if [[ -n ${LOCAL_KEY:-} ]]; then
         nix sign-paths -r -k "$LOCAL_KEY" "$CLOSURE"
-    fi
-
-    if [[ "$BARE_SERVER" == 1 ]]; then
-        echo "Checking if $HOST is up..."
-        if ! timeout 5 ssh "${SSHOPTS[@]}" "$USER@$HOST" true; then
-            echo "***** $HOST appears to be down *****"
-            read -r -p "Enter a different hostname or an IP address for $NODE ($HOST)" HOST
-        fi
     fi
 
     if [[ "$ACTIVATE" == null ]]; then
@@ -89,7 +89,7 @@ deploy_profile() {
 
     # shellcheck disable=SC2029
     # shellcheck disable=SC2087
-    ssh "${SSHOPTS[@]}" "$SSH_USER@$HOST" <<EOF
+    ssh $NIX_SSHOPTS "$SSH_USER@$HOST" <<EOF
 export PROFILE="$PROFILE_PATH"
 set -euxo pipefail
 $SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE"
@@ -99,6 +99,11 @@ EOF
 }
 
 deploy_all_profiles() {
+    if [[ "$BARE_SERVER" == 1 ]]; then
+        echo "==== Bootstrapping node $NODE ===="
+
+        PROFILE=system deploy_profile
+    fi
     echo "==== Deploying all profiles of node $NODE ===="
     for PROFILE in $(jq -r ".nodes.$NODE.profiles | keys[]" <<< "$JSON"); do
         deploy_profile

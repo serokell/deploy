@@ -72,7 +72,7 @@ deploy_profile() {
         PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/$PROFILE"
     fi
 
-    nix build "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
+    nix build --no-link "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
 
     if [[ -n ${LOCAL_KEY:-} ]]; then
         nix sign-paths -r -k "$LOCAL_KEY" "$CLOSURE"

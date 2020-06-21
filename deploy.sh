@@ -30,8 +30,7 @@ deploy_profile() {
     echo "=== Deploying profile $PROFILE of node $NODE ==="
 
     ONLY_PROFILE="del(.path) | del(.activate)"
-    MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.$NODE | del(.profiles) | $ONLY_PROFILE) + (.nodes.$NODE.profiles.$PROFILE | del(.hostname))" <<< "$JSON")"
-
+    MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.\"$NODE\" | del(.profiles) | $ONLY_PROFILE) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
     HOST="$(get hostname <<< "$MERGED")"
     SSH_USER="$(get sshUser <<< "$MERGED")"
     USER="$(get user <<< "$MERGED")"
@@ -105,7 +104,7 @@ deploy_all_profiles() {
         PROFILE=system deploy_profile
     fi
     echo "==== Deploying all profiles of node $NODE ===="
-    for PROFILE in $(jq -r ".nodes.$NODE.profiles | keys[]" <<< "$JSON"); do
+    for PROFILE in $(jq -r ".nodes.\"$NODE\".profiles | keys[]" <<< "$JSON"); do
         deploy_profile
     done
 }

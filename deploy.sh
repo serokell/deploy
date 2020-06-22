@@ -33,7 +33,7 @@ deploy_profile() {
     MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.\"$NODE\" | del(.profiles) | $ONLY_PROFILE) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
     HOST="$(get hostname <<< "$MERGED")"
     SSH_USER="$(get sshUser <<< "$MERGED")"
-    PPOFILE_USER="$(get user <<< "$MERGED")"
+    PROFILE_USER="$(get user <<< "$MERGED")"
     CLOSURE="$(get path <<< "$MERGED")"
     ACTIVATE="$(get activate <<< "$MERGED")"
     EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
@@ -92,6 +92,7 @@ deploy_profile() {
 
     # shellcheck disable=SC2029
     # shellcheck disable=SC2087
+    # shellcheck disable=SC2086
     ssh $NIX_SSHOPTS "$SSH_USER@$HOST" <<EOF
 export PROFILE="$PROFILE_PATH"
 set -euxo pipefail

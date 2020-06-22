@@ -33,11 +33,10 @@ deploy_profile() {
     MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.\"$NODE\" | del(.profiles) | $ONLY_PROFILE) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
     HOST="$(get hostname <<< "$MERGED")"
     SSH_USER="$(get sshUser <<< "$MERGED")"
-    USER="$(get user <<< "$MERGED")"
+    PPOFILE_USER="$(get user <<< "$MERGED")"
     CLOSURE="$(get path <<< "$MERGED")"
     ACTIVATE="$(get activate <<< "$MERGED")"
     EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
-
 
     ensure_set HOST hostname
     ensure_set CLOSURE path
@@ -51,13 +50,14 @@ deploy_profile() {
     SUDO=""
 
     if [[ "$SSH_USER" == null ]]; then
-        if [[ "$USER" == null ]]; then
+        if [[ "$PROFILE_USER" == null ]]; then
             echo "neither user nor sshUser set for profile $PROFILE of node $NODE"
+            exit 1
         fi
-        SSH_USER=$(whoami)
+        SSH_USER="$USER"
     else
-        if [[ ! "$USER" == null ]] && [[ ! "$USER" == "$SSH_USER" ]]; then
-            SUDO="sudo -u $USER"
+        if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$SSH_USER" ]]; then
+            SUDO="sudo -u $PROFILE_USER"
         fi
 
         if [[ "$USER" == null ]]; then
@@ -72,7 +72,11 @@ deploy_profile() {
         PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/$PROFILE"
     fi
 
-    nix build --no-link "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
+    if [[ "$FLAKE_SUPPORT" == 1 ]]; then
+        nix build --no-link "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
+    else
+        nix-build "$REPO" -A "deploy.nodes.$NODE.profiles.$PROFILE.path" --no-out-link
+    fi
 
     if [[ -n ${LOCAL_KEY:-} ]]; then
         nix sign-paths -r -k "$LOCAL_KEY" "$CLOSURE"
@@ -139,7 +143,15 @@ if grep "\#" <<< "$FLAKE" > /dev/null; then
     fi
 fi
 
-JSON="$(nix eval --json "$REPO"#deploy "$@")"
+
+if nix eval --expr "builtins.getFlake" > /dev/null; then
+    FLAKE_SUPPORT=1
+    JSON="$(nix eval --json "$REPO"#deploy "$@")"
+else
+    FLAKE_SUPPORT=0
+    JSON="$(nix-instantiate --strict --read-write-mode --json --eval -E "let r = import $REPO/.; in if builtins.isFunction r then (r {}).deploy else r.deploy")"
+fi
+
 
 if [[ -z ${NODE:-} ]]; then
     deploy_all_nodes

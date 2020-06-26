@@ -16,7 +16,14 @@ else
 fi
 
 get() {
-    jq -r ".$1"
+    set +u
+    FROM_ENV="$(eval "echo \$$1")"
+    set -u
+    if [[ ! -z "$FROM_ENV" ]]; then
+        echo "$FROM_ENV"
+    else
+        jq -r ".$1"
+    fi
 }
 
 ensure_set() {
@@ -36,6 +43,7 @@ deploy_profile() {
     PROFILE_USER="$(get user <<< "$MERGED")"
     CLOSURE="$(get path <<< "$MERGED")"
     ACTIVATE="$(get activate <<< "$MERGED")"
+    FAST_CONNECTION="$(get fastConnection <<< "$MERGED")"
     EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
 
     ensure_set HOST hostname
@@ -45,9 +53,10 @@ deploy_profile() {
         EXTRA_SSH_OPTS=""
     fi
 
-    export NIX_SSHOPTS="${SSHOPTS:-} ${EXTRA_SSH_OPTS}"
+    export NIX_SSHOPTS="${EXTRA_SSH_OPTS}"
 
     SUDO=""
+
 
     if [[ "$SSH_USER" == null ]]; then
         if [[ "$PROFILE_USER" == null ]]; then
@@ -60,16 +69,16 @@ deploy_profile() {
             SUDO="sudo -u $PROFILE_USER"
         fi
 
-        if [[ "$USER" == null ]]; then
-            USER="$SSH_USER"
+        if [[ "$PROFILE_USER" == null ]]; then
+            PROFILE_USER="$SSH_USER"
         fi
     fi
 
 
-    if [[ "$USER" == root ]]; then
+    if [[ "$PROFILE_USER" == root ]]; then
         PROFILE_PATH="/nix/var/nix/profiles/$PROFILE"
     else
-        PROFILE_PATH="/nix/var/nix/profiles/per-user/$USER/$PROFILE"
+        PROFILE_PATH="/nix/var/nix/profiles/per-user/$PROFILE_USER/$PROFILE"
     fi
 
     if [[ "$FLAKE_SUPPORT" == 1 ]]; then
@@ -86,9 +95,16 @@ deploy_profile() {
         ACTIVATE=true
     fi
 
+    EXTRA_NIX_COPY_OPTS=""
+
+    if [[ ! "$FAST_CONNECTION" == true ]]; then
+        EXTRA_NIX_COPY_OPTS="$EXTRA_NIX_COPY_OPTS --substitute-on-destination"
+    fi
+
     set -x
 
-    nix copy --substitute-on-destination --to "ssh://$SSH_USER@$HOST" "$CLOSURE"
+    # shellcheck disable=SC2086
+    nix copy $EXTRA_NIX_COPY_OPTS --no-check-sigs --to "ssh://$SSH_USER@$HOST" "$CLOSURE"
 
     # shellcheck disable=SC2029
     # shellcheck disable=SC2087

@@ -14,11 +14,12 @@
     };
 
     # This is the application we actually want to run
-    defaultPackage.x86_64-linux = import ./hello.nix nixpkgs.legacyPackages.x86_64-linux;
+    defaultPackage.x86_64-linux = import ./hello.nix nixpkgs;
 
     deploy.nodes.example = {
       sshOpts = "-p 2221";
       hostname = "localhost";
+      fastConnection = true;
       profiles = {
         system = {
           sshUser = "admin";

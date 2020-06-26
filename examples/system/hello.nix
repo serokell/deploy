@@ -1,20 +1,21 @@
-pkgs:
-# We should probably create a flake that simplifies this
-
+nixpkgs:
 let
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  generateSystemd = type: name: config:
+    (nixpkgs.lib.nixosSystem {
+      modules = [{ systemd."${type}s".${name} = config; }];
+      system = "x86_64-linux";
+    }).config.systemd.units."${name}.${type}".text;
+
+  mkService = generateSystemd "service";
+
   service = pkgs.writeTextFile {
     name = "hello.service";
-    text = ''
-      [Install]
-      WantedBy=default.target
-
-      [Service]
-      ExecStart=${pkgs.hello}/bin/hello
-      Type=oneshot
-
-      [Unit]
-      Description=Hello world
-    '';
+    text = mkService "hello" {
+      unitConfig.WantedBy = [ "multi-user.target" ];
+      path = [ pkgs.hello ];
+      script = "hello";
+    };
   };
 in pkgs.writeShellScriptBin "activate" ''
   mkdir -p $HOME/.config/systemd/user

@@ -64,14 +64,14 @@ deploy_profile() {
             exit 1
         fi
         SSH_USER="$USER"
-    else
-        if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$SSH_USER" ]]; then
-            SUDO="sudo -u $PROFILE_USER"
-        fi
 
-        if [[ "$PROFILE_USER" == null ]]; then
-            PROFILE_USER="$SSH_USER"
-        fi
+    fi
+    if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$SSH_USER" ]]; then
+        SUDO="sudo -u $PROFILE_USER"
+    fi
+
+    if [[ "$PROFILE_USER" == null ]]; then
+        PROFILE_USER="$SSH_USER"
     fi
 
 

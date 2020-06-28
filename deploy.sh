@@ -45,6 +45,8 @@ deploy_profile() {
     ACTIVATE="$(get activate <<< "$MERGED")"
     FAST_CONNECTION="$(get fastConnection <<< "$MERGED")"
     EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
+    BOOTSTRAP="$(get bootstrap <<< "$MERGED")"
+    AUTO_ROLLBACK="$(get autoRollback <<< "$MERGED")"
 
     ensure_set HOST hostname
     ensure_set CLOSURE path
@@ -110,10 +112,26 @@ deploy_profile() {
     # shellcheck disable=SC2087
     # shellcheck disable=SC2086
     ssh $NIX_SSHOPTS "$SSH_USER@$HOST" <<EOF
+set -euo pipefail
 export PROFILE="$PROFILE_PATH"
-set -euxo pipefail
+if [[ ! -e "$PROFILE_PATH" ]] && [[ -n "$BOOTSTRAP" ]]; then
+    echo "Bootstrapping"
+    DO_BOOTSTRAP=1
+else
+    DO_BOOTSTRAP=0
+fi
 $SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE"
-eval "$SUDO $ACTIVATE"
+if [[ "\$DO_BOOTSTRAP" -eq 1 ]]; then
+   eval "set -x; $SUDO $BOOTSTRAP; set +x"
+fi
+set -x
+eval "$SUDO $ACTIVATE" || {
+   if [[ "$AUTO_ROLLBACK" == true ]]; then
+      $SUDO nix-env -p "$PROFILE_PATH" --rollback
+      # Assuming that activation command didn't change
+      eval "$SUDO $ACTIVATE"
+   fi
+}
 EOF
     set +x
 }

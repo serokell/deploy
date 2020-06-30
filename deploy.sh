@@ -128,7 +128,10 @@ else
 fi
 $SUDO nix-env -p "$profile_path" --set "$closure"
 if [[ "\$DO_bootstrap" -eq 1 ]]; then
-   eval "set -x; $SUDO $bootstrap; set +x"
+   eval "set -x; $SUDO $bootstrap; set +x" || {
+        rm "$profile_path"
+        exit 1
+   }
 fi
 set -x
 eval "$SUDO $activate" || {

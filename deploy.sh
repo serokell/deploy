@@ -10,17 +10,17 @@ set -euo pipefail
 if [[ ${1:-} == '--prime' ]]; then
     shift
 
-    BARE_SERVER=1
+    bare_server=1
 else
-    BARE_SERVER=0
+    bare_server=0
 fi
 
 get() {
     set +u
-    FROM_ENV="$(eval "echo \$$1")"
+    local from_env="$(eval "echo \$$1")"
     set -u
-    if [[ ! -z "$FROM_ENV" ]]; then
-        echo "$FROM_ENV"
+    if [[ ! -z "$from_env" ]]; then
+        echo "$from_env"
     else
         jq -r ".$1"
     fi
@@ -36,103 +36,108 @@ ensure_set() {
 deploy_profile() {
     echo "=== Deploying profile $PROFILE of node $NODE ==="
 
-    ONLY_PROFILE="del(.path) | del(.activate)"
-    MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.\"$NODE\" | del(.profiles) | $ONLY_PROFILE) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
+    local only_profile="del(.path) | del(.activate)"
+    local merged="$(jq "(. | del(.nodes) | del(.hostname) | $only_profile) + (.nodes.\"$NODE\" | del(.profiles) | $only_profile) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
 
-    HOST="$(get hostname <<< "$MERGED")"
-    SSH_USER="$(get sshUser <<< "$MERGED")"
-    PROFILE_USER="$(get user <<< "$MERGED")"
-    CLOSURE="$(get path <<< "$MERGED")"
-    ACTIVATE="$(get activate <<< "$MERGED")"
-    FAST_CONNECTION="$(get fastConnection <<< "$MERGED")"
-    EXTRA_SSH_OPTS="$(get sshOpts <<< "$MERGED")"
-    BOOTSTRAP="$(get bootstrap <<< "$MERGED")"
-    AUTO_ROLLBACK="$(get autoRollback <<< "$MERGED")"
+    host="$(get hostname <<< "$merged")"
+    ssh_user="$(get sshUser <<< "$merged")"
+    profile_user="$(get user <<< "$merged")"
+    closure="$(get path <<< "$merged")"
+    activate="$(get activate <<< "$merged")"
+    fast_connection="$(get fastConnection <<< "$merged")"
+    extra_ssh_opts="$(get sshOpts <<< "$merged")"
+    bootstrap="$(get bootstrap <<< "$merged")"
+    auto_rollback="$(get autoRollback <<< "$merged")"
 
-    ensure_set HOST hostname
-    ensure_set CLOSURE path
+    ensure_set host hostname
+    ensure_set closure path
 
-    if [[ "$EXTRA_SSH_OPTS" == null ]]; then
-        EXTRA_SSH_OPTS=""
+    if [[ "$extra_ssh_opts" == null ]]; then
+        extra_ssh_opts=""
     fi
 
-    export NIX_SSHOPTS="${EXTRA_SSH_OPTS}"
+    export NIX_SSHOPTS="${extra_ssh_opts}"
 
     SUDO=""
 
 
-    if [[ "$SSH_USER" == null ]]; then
-        if [[ "$PROFILE_USER" == null ]]; then
+    if [[ "$ssh_user" == null ]]; then
+        if [[ "$profile_user" == null ]]; then
             echo "neither user nor sshUser set for profile $PROFILE of node $NODE"
             exit 1
         fi
-        SSH_USER="$USER"
+        ssh_user="$USER"
 
     fi
-    if [[ ! "$PROFILE_USER" == null ]] && [[ ! "$PROFILE_USER" == "$SSH_USER" ]]; then
-        SUDO="sudo -u $PROFILE_USER"
+    if [[ ! "$profile_user" == null ]] && [[ ! "$profile_user" == "$ssh_user" ]]; then
+        SUDO="sudo -u $profile_user"
     fi
 
-    if [[ "$PROFILE_USER" == null ]]; then
-        PROFILE_USER="$SSH_USER"
+    if [[ "$profile_user" == null ]]; then
+        profile_user="$ssh_user"
     fi
 
+    local profile_path
 
-    if [[ "$PROFILE_USER" == root ]]; then
-        PROFILE_PATH="/nix/var/nix/profiles/$PROFILE"
+    if [[ "$profile_user" == root ]]; then
+        profile_path="/nix/var/nix/profiles/$PROFILE"
     else
-        PROFILE_PATH="/nix/var/nix/profiles/per-user/$PROFILE_USER/$PROFILE"
+        profile_path="/nix/var/nix/profiles/per-user/$profile_user/$PROFILE"
     fi
 
-    if [[ "$FLAKE_SUPPORT" == 1 ]]; then
+    if [[ "$flake_support" == 1 ]]; then
         nix build --no-link "$REPO#deploy.nodes.$NODE.profiles.$PROFILE.path"
     else
         nix-build "$REPO" -A "deploy.nodes.$NODE.profiles.$PROFILE.path" --no-out-link
     fi
 
     if [[ -n ${LOCAL_KEY:-} ]]; then
-        nix sign-paths -r -k "$LOCAL_KEY" "$CLOSURE"
+        nix sign-paths -r -k "$LOCAL_KEY" "$closure"
     fi
 
-    if [[ "$ACTIVATE" == null ]]; then
-        ACTIVATE=true
+    if [[ "$activate" == null ]]; then
+        activate=true
+    fi
+
+    if [[ "$bootstrap" == null ]]; then
+        bootstrap=true
     fi
 
     EXTRA_NIX_COPY_OPTS=""
 
-    if [[ ! "$FAST_CONNECTION" == true ]]; then
+    if [[ ! "$fast_connection" == true ]]; then
         EXTRA_NIX_COPY_OPTS="$EXTRA_NIX_COPY_OPTS --substitute-on-destination"
     fi
 
     set -x
 
     # shellcheck disable=SC2086
-    nix copy $EXTRA_NIX_COPY_OPTS --no-check-sigs --to "ssh://$SSH_USER@$HOST" "$CLOSURE"
+    nix copy $EXTRA_NIX_COPY_OPTS --no-check-sigs --to "ssh://$ssh_user@$host" "$closure"
 
     # shellcheck disable=SC2029
     # shellcheck disable=SC2087
     # shellcheck disable=SC2086
-    ssh $NIX_SSHOPTS "$SSH_USER@$HOST" <<EOF
+    ssh $NIX_SSHOPTS "$ssh_user@$host" <<EOF
 set -euo pipefail
-export PROFILE="$PROFILE_PATH"
-if [[ ! -e "$PROFILE_PATH" ]] && [[ -n "$BOOTSTRAP" ]]; then
+export PROFILE="$profile_path"
+if [[ ! -e "$profile_path" ]] && [[ -n "$bootstrap" ]]; then
     echo "Bootstrapping"
-    DO_BOOTSTRAP=1
+    DO_bootstrap=1
 else
-    DO_BOOTSTRAP=0
+    DO_bootstrap=0
 fi
-$SUDO nix-env -p "$PROFILE_PATH" --set "$CLOSURE"
-if [[ "\$DO_BOOTSTRAP" -eq 1 ]]; then
-   eval "set -x; $SUDO $BOOTSTRAP; set +x"
+$SUDO nix-env -p "$profile_path" --set "$closure"
+if [[ "\$DO_bootstrap" -eq 1 ]]; then
+   eval "set -x; $SUDO $bootstrap; set +x"
 fi
 set -x
-eval "$SUDO $ACTIVATE" || {
-   if [[ "$AUTO_ROLLBACK" == true ]]; then
-      $SUDO nix-env -p "$PROFILE_PATH" --rollback
-      BROKEN="\$($SUDO nix-env -p "$PROFILE_PATH" --list-generations | tail -1 | cut -d" " -f1)"
-      $SUDO nix-env -p "$PROFILE_PATH" --delete-generations "\$BROKEN"
+eval "$SUDO $activate" || {
+   if [[ "$auto_rollback" == true ]]; then
+      $SUDO nix-env -p "$profile_path" --rollback
+      BROKEN="\$($SUDO nix-env -p "$profile_path" --list-generations | tail -1 | cut -d" " -f1)"
+      $SUDO nix-env -p "$profile_path" --delete-generations "\$BROKEN"
       # Assuming that activation command didn't change
-      eval "$SUDO $ACTIVATE"
+      eval "$SUDO $activate"
    fi
 }
 EOF
@@ -140,7 +145,7 @@ EOF
 }
 
 deploy_all_profiles() {
-    if [[ "$BARE_SERVER" == 1 ]]; then
+    if [[ "$bare_server" == 1 ]]; then
         echo "==== Bootstrapping node $NODE ===="
 
         PROFILE=system deploy_profile
@@ -183,10 +188,10 @@ fi
 
 
 if nix eval --expr "builtins.getFlake" > /dev/null; then
-    FLAKE_SUPPORT=1
+    flake_support=1
     JSON="$(nix eval --json "$REPO"#deploy "$@")"
 else
-    FLAKE_SUPPORT=0
+    flake_support=0
     JSON="$(nix-instantiate --strict --read-write-mode --json --eval -E "let r = import $REPO/.; in if builtins.isFunction r then (r {}).deploy else r.deploy")"
 fi
 

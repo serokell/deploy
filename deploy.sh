@@ -129,6 +129,8 @@ set -x
 eval "$SUDO $ACTIVATE" || {
    if [[ "$AUTO_ROLLBACK" == true ]]; then
       $SUDO nix-env -p "$PROFILE_PATH" --rollback
+      BROKEN="\$($SUDO nix-env -p "$PROFILE_PATH" --list-generations | tail -1 | cut -d" " -f1)"
+      $SUDO nix-env -p "$PROFILE_PATH" --delete-generations "\$BROKEN"
       # Assuming that activation command didn't change
       eval "$SUDO $ACTIVATE"
    fi

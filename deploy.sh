@@ -38,6 +38,7 @@ deploy_profile() {
 
     ONLY_PROFILE="del(.path) | del(.activate)"
     MERGED="$(jq "(. | del(.nodes) | del(.hostname) | $ONLY_PROFILE) + (.nodes.\"$NODE\" | del(.profiles) | $ONLY_PROFILE) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
+
     HOST="$(get hostname <<< "$MERGED")"
     SSH_USER="$(get sshUser <<< "$MERGED")"
     PROFILE_USER="$(get user <<< "$MERGED")"

@@ -142,6 +142,7 @@ eval "$SUDO $activate" || {
       # Assuming that activation command didn't change
       eval "$SUDO $activate"
    fi
+   exit 1
 }
 EOF
     set +x

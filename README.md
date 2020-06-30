@@ -14,17 +14,18 @@
 deploy
 ├── <generic args>
 └── nodes
-    └── <NODE>
-        ├── <generic args>
-        ├── hostname
-        └── profiles
-            └── <PROFILE>
-                ├── <generic args>
-                ├── (optional) activate
-                ├── (optional) bootstrap
-                └── path
-            ├── <PROFILE...>
-    ├── <NODE...>
+    ├── <NODE>
+    │   ├── <generic args>
+    │   ├── hostname
+    │   └── profiles
+    │       ├── <PROFILE>
+    │       │   ├── <generic args>
+    │       │   ├── activate
+    │       │   ├── bootstrap
+    │       │   └── path
+    │       └── <PROFILE>...
+    └── <NODE>...
+
 ```
 
 Where `<generic args>` are all optional and can be one or multiple of:

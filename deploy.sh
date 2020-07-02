@@ -37,7 +37,9 @@ deploy_profile() {
     echo "=== Deploying profile $PROFILE of node $NODE ==="
 
     local only_profile="del(.path) | del(.activate)"
-    local merged="$(jq "(. | del(.nodes) | del(.hostname) | $only_profile) + (.nodes.\"$NODE\" | del(.profiles) | $only_profile) + (.nodes.\"$NODE\".profiles.\"$PROFILE\" | del(.hostname))" <<< "$JSON")"
+    local merged="$(NODE="$NODE" PROFILE="$PROFILE" jq "(. | del(.nodes) | del(.hostname) | $only_profile) \
+                      + (.nodes[env.NODE] | del(.profiles) | $only_profile) \
+                      + (.nodes[env.NODE].profiles[env.PROFILE] | del(.hostname))" <<< "$JSON")"
 
     host="$(get hostname <<< "$merged")"
     ssh_user="$(get sshUser <<< "$merged")"

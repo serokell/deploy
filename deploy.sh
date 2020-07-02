@@ -17,9 +17,10 @@ fi
 
 get() {
     set +u
-    local from_env="$(eval "echo \$$1")"
+    local from_env
+    from_env="$(eval "echo \$$1")"
     set -u
-    if [[ ! -z "$from_env" ]]; then
+    if [[ -n "$from_env" ]]; then
         echo "$from_env"
     else
         jq -r ".$1"
@@ -37,7 +38,8 @@ deploy_profile() {
     echo "=== Deploying profile $PROFILE of node $NODE ==="
 
     local only_profile="del(.path) | del(.activate)"
-    local merged="$(NODE="$NODE" PROFILE="$PROFILE" jq "(. | del(.nodes) | del(.hostname) | $only_profile) \
+    local merged
+    merged="$(NODE="$NODE" PROFILE="$PROFILE" jq "(. | del(.nodes) | del(.hostname) | $only_profile) \
                       + (.nodes[env.NODE] | del(.profiles) | $only_profile) \
                       + (.nodes[env.NODE].profiles[env.PROFILE] | del(.hostname))" <<< "$JSON")"
 

@@ -35,5 +35,12 @@
         };
       };
     };
+
+    checks = builtins.mapAttrs (_: pkgs: {
+      jsonschema = pkgs.runCommandNoCC "jsonschema-deploy-system" { }
+      "${pkgs.python3.pkgs.jsonschema}/bin/jsonschema -i ${
+        pkgs.writeText "deploy.json" (builtins.toJSON self.deploy)
+      } ${../../interface/deploy.json} && touch $out";
+    }) nixpkgs.legacyPackages;
   };
 }

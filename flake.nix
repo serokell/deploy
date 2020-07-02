@@ -7,9 +7,10 @@
       type = "app";
       program = toString ./deploy.sh;
     });
-    checks = builtins.mapAttrs (_: pkgs: {
-      shellcheck = pkgs.runCommandNoCC "shellcheck-deploy" { }
-        "${pkgs.shellcheck}/bin/shellcheck ${./deploy.sh}; touch $out";
-    }) nixpkgs.legacyPackages;
+    checks = builtins.mapAttrs (_: pkgs:
+      {
+        shellcheck = pkgs.runCommandNoCC "shellcheck-deploy" { }
+          "${pkgs.shellcheck}/bin/shellcheck ${./deploy.sh}; touch $out";
+      }) nixpkgs.legacyPackages;
   };
 }

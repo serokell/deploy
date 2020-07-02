@@ -11,5 +11,11 @@
         activate = "$PROFILE/bin/hello";
       };
     };
+    checks = builtins.mapAttrs (_: pkgs: {
+      jsonschema = pkgs.runCommandNoCC "jsonschema-deploy-simple" { }
+        "${pkgs.python3.pkgs.jsonschema}/bin/jsonschema -i ${
+          pkgs.writeText "deploy.json" (builtins.toJSON self.deploy)
+        } ${../../interface/deploy.json} && touch $out";
+    }) nixpkgs.legacyPackages;
   };
 }

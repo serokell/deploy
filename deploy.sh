@@ -124,7 +124,7 @@ deploy_profile() {
     ssh $NIX_SSHOPTS "$ssh_user@$host" <<EOF
 set -euo pipefail
 export PROFILE="$profile_path"
-if [[ ! -e "$profile_path" ]] && [[ -n "$bootstrap" ]]; then
+if [[ ! -e "$profile_path" ]] && [[ "$bootstrap" != null ]]; then
     echo "Bootstrapping"
     DO_bootstrap=1
 else

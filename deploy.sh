@@ -215,5 +215,3 @@ if [[ -z ${PROFILE:-} ]]; then
 fi
 
 deploy_profile
-
-exit 0

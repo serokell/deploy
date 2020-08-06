@@ -43,6 +43,8 @@ deploy_profile() {
                       + (.nodes[env.NODE] | del(.profiles) | $only_profile) \
                       + (.nodes[env.NODE].profiles[env.PROFILE] | del(.hostname))" <<< "$JSON")"
 
+    local ssh_user host profile_user closure activate fast_connection extra_ssh_opts bootstrap auto_rollback
+
     host="$(get hostname <<< "$merged")"
     ssh_user="$(get sshUser <<< "$merged")"
     profile_user="$(get user <<< "$merged")"

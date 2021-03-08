@@ -1,6 +1,6 @@
 # Deploy
 
-**THIS IS CURRENTLY WIP, AND PROBABLY DOES NOT WORK AT ALL**
+⚠ **THIS REPOSITORY IS DEPRECATED IN FAVOR OF https://github.com/serokell/deploy-rs**
 
 ## TL;DR Usage
 
